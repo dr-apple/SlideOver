@@ -3,6 +3,8 @@
 set -e
 cd "$(dirname "$0")"
 APP=build/SlideOver.app
+VERSION=${VERSION:-$(cat VERSION)}
+BUILD=$(git rev-list --count HEAD 2>/dev/null || echo 1)
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 swiftc -O -swift-version 5 main.swift -o "$APP/Contents/MacOS/SlideOver" -framework Cocoa -framework Carbon
@@ -14,8 +16,8 @@ cat > "$APP/Contents/Info.plist" <<EOF
   <key>CFBundleName</key><string>SlideOver</string>
   <key>CFBundleExecutable</key><string>SlideOver</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>
-  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleShortVersionString</key><string>$VERSION</string>
+  <key>CFBundleVersion</key><string>$BUILD</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
 </dict></plist>
