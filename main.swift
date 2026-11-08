@@ -453,7 +453,13 @@ final class Updater: @unchecked Sendable {
                 var req = URLRequest(url: URL(string: "https://api.github.com/repos/\(Self.repo)/releases/latest")!)
                 req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
                 req.setValue("SlideOver-Updater", forHTTPHeaderField: "User-Agent")
-                let (data, _) = try await URLSession.shared.data(for: req)
+                let (data, resp) = try await URLSession.shared.data(for: req)
+                let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+                guard status == 200 else {
+                    NSLog("SlideOver update check: HTTP \(status) \(String(decoding: data.prefix(300), as: UTF8.self))")
+                    throw NSError(domain: "SlideOver", code: status,
+                                  userInfo: [NSLocalizedDescriptionKey: "GitHub antwortet mit HTTP \(status)."])
+                }
                 guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                       let tag = json["tag_name"] as? String,
                       let assets = json["assets"] as? [[String: Any]],
@@ -472,6 +478,7 @@ final class Updater: @unchecked Sendable {
                 await MainActor.run { self.available = (version, url) }
                 if auto || userInitiated { try await install(version: version, from: url) }
             } catch {
+                NSLog("SlideOver update failed: \(error)")
                 if userInitiated {
                     await MainActor.run { self.alert("Update fehlgeschlagen", error.localizedDescription) }
                 }
