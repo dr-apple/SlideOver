@@ -5,6 +5,31 @@
 import Cocoa
 import Carbon.HIToolbox
 import ApplicationServices
+import ServiceManagement
+
+// MARK: - Bei Anmeldung starten
+
+enum LoginItem {
+    static var enabled: Bool { SMAppService.mainApp.status == .enabled }
+    static var needsApproval: Bool { SMAppService.mainApp.status == .requiresApproval }
+
+    static func set(_ on: Bool) {
+        do {
+            if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+        } catch {
+            NSLog("SlideOver login item: \(error)")
+        }
+        if on && needsApproval { SMAppService.openSystemSettingsLoginItems() }
+    }
+
+    /// Beim allerersten Start (auch nach einem Update von einer älteren Version) einmal aktivieren.
+    static func setupDefault() {
+        let key = "loginItemConfigured"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        if SMAppService.mainApp.status != .enabled { set(true) }
+    }
+}
 
 // MARK: - Einstellungen
 
@@ -591,6 +616,7 @@ final class SlideOverController: NSObject, NSApplicationDelegate, NSMenuDelegate
 
         registerHotKeys()
         Updater.shared.start()
+        LoginItem.setupDefault()
 
         let nc = NSWorkspace.shared.notificationCenter
         nc.addObserver(self, selector: #selector(appActivated(_:)),
@@ -693,6 +719,13 @@ final class SlideOverController: NSObject, NSApplicationDelegate, NSMenuDelegate
             menu.addItem(.separator())
         }
 
+        let login = NSMenuItem(title: LoginItem.needsApproval ? "Bei Anmeldung starten (in Systemeinstellungen erlauben)"
+                                                              : "Bei Anmeldung starten",
+                               action: #selector(toggleLoginItem), keyEquivalent: "")
+        login.target = self
+        login.state = LoginItem.enabled ? .on : (LoginItem.needsApproval ? .mixed : .off)
+        menu.addItem(login)
+
         for (title, sel, on) in [
             ("Pfeil am Rand anzeigen", #selector(toggleHandle), Prefs.showHandle),
             ("Am Bildschirmrand einblenden", #selector(toggleEdge), Prefs.edgeTrigger),
@@ -756,6 +789,10 @@ final class SlideOverController: NSObject, NSApplicationDelegate, NSMenuDelegate
     @objc func checkUpdates() { Updater.shared.check(userInitiated: true) }
     @objc func installUpdate() { Updater.shared.installAvailable() }
     @objc func toggleAutoUpdate() { Updater.shared.auto.toggle() }
+    @objc func toggleLoginItem() {
+        if LoginItem.needsApproval { SMAppService.openSystemSettingsLoginItems(); return }
+        LoginItem.set(!LoginItem.enabled)
+    }
     @objc func openAXSettings() {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
     }

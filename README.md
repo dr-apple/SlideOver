@@ -13,6 +13,7 @@ iPadOS-style **Slide Over** for macOS – a tiny menu bar app that lets any Mac 
 - Optional: show it by resting the mouse at the screen edge (~0.3 s, corners excluded so Hot Corners keep working)
 - Optional: auto-hide when you switch to another app
 - Launches the app if it isn't running yet
+- **Starts at login** (on by default, toggle in the menu) and remembers both apps, positions and sizes across restarts
 - **Auto-update**: checks GitHub Releases on launch and every 6 hours, downloads, replaces itself and relaunches (can be turned off in the menu)
 - No dependencies, a single Swift file, no Xcode project needed
 
@@ -61,7 +62,7 @@ Builds the app, commits, tags, pushes and creates a GitHub Release with the ZIP.
 
 ## Deutsch
 
-Slide Over wie auf dem iPad (iPadOS 26) für den Mac: Je eine App pro Seite (links/rechts) gleitet per Tastenkürzel, Mausbewegung an den Bildschirmrand oder Klick auf den Pfeil-Griff vom Rand herein. Position und Größe werden pro Seite und App gemerkt. Die App aktualisiert sich automatisch über GitHub Releases.
+Slide Over wie auf dem iPad (iPadOS 26) für den Mac: Je eine App pro Seite (links/rechts) gleitet per Tastenkürzel, Mausbewegung an den Bildschirmrand oder Klick auf den Pfeil-Griff vom Rand herein. Position und Größe werden pro Seite und App gemerkt. Die App startet bei der Anmeldung, merkt sich alles über Neustarts hinweg und aktualisiert sich automatisch über GitHub Releases.
 
 Installation: `./build.sh install`, danach in Systemeinstellungen → Datenschutz & Sicherheit → Bedienungshilfen den Zugriff für **SlideOver** erlauben.
 
