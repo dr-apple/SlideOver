@@ -9,8 +9,8 @@ iPadOS-style **Slide Over** for macOS – a tiny menu bar app that lets any Mac 
 - **Two Slide Over apps – one per side**: assign one app to the left edge and one to the right edge
 - Each slides in and out from its edge with an animation
 - Remembers **position and size per side and app** – just move/resize the window, it'll come back exactly there
-- **Arrow handle** at the screen edge (like on iPad) when Slide Over is stashed away or covered – click it to bring the app back
-- Optional: show it by resting the mouse at the screen edge (~0.3 s, corners excluded so Hot Corners keep working)
+- **Arrow handle** at the screen edge (like on iPad) when Slide Over is stashed away or covered – it only fades in when the mouse comes near the edge and never shows over fullscreen apps (e.g. videos); click it to bring the app back
+- Optional: show it by resting the mouse at the screen edge (~0.3 s, corners excluded so Hot Corners keep working; disabled over fullscreen apps)
 - Optional: auto-hide when you switch to another app
 - Launches the app if it isn't running yet
 - **Starts at login** (on by default, toggle in the menu) and remembers both apps, positions and sizes across restarts

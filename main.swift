@@ -140,6 +140,23 @@ func flip(_ r: CGRect) -> CGRect {
     CGRect(x: r.minX, y: primaryHeight - r.maxY, width: r.width, height: r.height)
 }
 
+/// Liegt auf diesem Bildschirm ein Fenster, das den ganzen Bildschirm (inkl. Menüleiste) bedeckt? → Vollbild (z.B. Video).
+func isFullscreen(_ screen: NSScreen) -> Bool {
+    guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+            as? [[String: Any]] else { return false }
+    let target = flip(screen.frame)
+    let myPID = ProcessInfo.processInfo.processIdentifier
+    for w in list {
+        guard (w[kCGWindowLayer as String] as? Int) == 0,
+              (w[kCGWindowOwnerPID as String] as? Int32) != myPID,
+              let bd = w[kCGWindowBounds as String] as? NSDictionary,
+              let b = CGRect(dictionaryRepresentation: bd as CFDictionary) else { continue }
+        if abs(b.minX - target.minX) < 2, abs(b.minY - target.minY) < 2,
+           abs(b.width - target.width) < 2, abs(b.height - target.height) < 2 { return true }
+    }
+    return false
+}
+
 func appName(_ id: String?) -> String {
     guard let id, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else { return "–" }
     return FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
@@ -402,9 +419,13 @@ final class Slot {
 
     // MARK: Griff
 
+    /// Griff darf erscheinen (App läuft, Slide Over weg oder verdeckt). Sichtbar wird er erst, wenn die Maus in die Nähe kommt.
+    var handleEligible = false
+    var handleVisible = false
+
     func updateHandle() {
-        let wanted = Prefs.showHandle && app != nil && (!visibleNow || coveredNow)
-        guard wanted else { handle.orderOut(nil); return }
+        handleEligible = Prefs.showHandle && app != nil && (!visibleNow || coveredNow)
+        guard handleEligible else { setHandleVisible(false); return }
         let screen = screenForShow()
         let (on, _) = frames(on: screen)
         let size = handle.frame.size
@@ -413,7 +434,36 @@ final class Slot {
         let x = side == .right ? f.maxX - size.width - 2 : f.minX + 2
         let y = min(max(midY - size.height / 2, screen.visibleFrame.minY + 4), screen.visibleFrame.maxY - size.height - 4)
         handle.setFrameOrigin(NSPoint(x: x, y: y))
-        handle.orderFrontRegardless()
+        updateHover(NSEvent.mouseLocation)
+    }
+
+    /// Griff nur zeigen, wenn die Maus nah am Rand ist – und nie über einer Vollbild-App.
+    func updateHover(_ m: NSPoint) {
+        guard handleEligible else { setHandleVisible(false); return }
+        let hf = handle.frame
+        guard let screen = NSScreen.screens.first(where: { $0.frame.intersects(hf) }),
+              NSMouseInRect(m, screen.frame, false) else { setHandleVisible(false); return }
+        let f = screen.frame
+        let dist = side == .right ? f.maxX - m.x : m.x - f.minX
+        let near = dist <= 48 && m.y > f.minY + f.height * 0.1 && m.y < f.maxY - f.height * 0.1
+        // Vollbild nur prüfen, wenn nötig (CGWindowList ist nicht ganz billig)
+        setHandleVisible(near && !isFullscreen(screen))
+    }
+
+    func setHandleVisible(_ v: Bool) {
+        guard v != handleVisible else { return }
+        handleVisible = v
+        if v {
+            handle.alphaValue = 0
+            handle.orderFrontRegardless()
+        }
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = v ? 0.15 : 0.25
+            handle.animator().alphaValue = v ? 1 : 0
+        }, completionHandler: { [weak self] in
+            guard let self, !self.handleVisible else { return }
+            self.handle.orderOut(nil)
+        })
     }
 
     // MARK: Bildschirmrand
@@ -432,7 +482,10 @@ final class Slot {
         }
         if atEdge && inMiddle && !neighbour {
             if let since = edgeSince {
-                if Date().timeIntervalSince(since) > 0.3 { edgeSince = nil; shownScreen = s; show(animated: true) }
+                if Date().timeIntervalSince(since) > 0.3 {
+                    edgeSince = nil
+                    if !isFullscreen(s) { shownScreen = s; show(animated: true) } // kein Hereinspringen über Vollbild-Videos
+                }
             } else { edgeSince = Date() }
         } else {
             edgeSince = nil
@@ -630,7 +683,7 @@ final class SlideOverController: NSObject, NSApplicationDelegate, NSMenuDelegate
 
         edgeTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
             let m = NSEvent.mouseLocation
-            self?.slots.values.forEach { $0.checkEdge(m) }
+            self?.slots.values.forEach { $0.checkEdge(m); $0.updateHover(m) }
         }
         refresh()
     }
