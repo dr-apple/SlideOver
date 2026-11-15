@@ -1,8 +1,14 @@
 # SlideOver
 
+**English** · [Deutsch](README.de.md)
+
+[![Latest release](https://img.shields.io/github/v/release/dr-apple/SlideOver)](https://github.com/dr-apple/SlideOver/releases/latest)
+
+![SlideOver](docs/images/banner.svg)
+
 iPadOS-style **Slide Over** for macOS – a tiny menu bar app that lets any Mac app slide in from the edge of the screen, just like on the iPad.
 
-*Deutsch weiter unten.*
+![One app per screen edge slides in over the main app](docs/images/slide-over.svg)
 
 ## Features
 
@@ -44,6 +50,21 @@ On first launch, grant **Accessibility** access (System Settings → Privacy & S
 
 > **Note:** The app is ad-hoc signed, so after each update/rebuild macOS treats it as a new app. After an auto-update SlideOver resets its own Accessibility entry so macOS asks again – just allow it. After a manual rebuild, remove the SlideOver entry under Accessibility with “–”, relaunch and grant access again.
 
+## Example: a typical setup
+
+1. Open **Messages** and press `⌃⌥⇧A` – Messages becomes the left Slide Over app.
+2. Open **Music** and press `⌃⌥⇧S` – Music becomes the right Slide Over app.
+3. Resize/move both once to taste – SlideOver remembers it.
+4. From now on `⌃⌥A` / `⌃⌥S` (or resting the mouse at the edge, if enabled) bring them in and out over whatever you're working on.
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| Windows don't move | Accessibility access missing – System Settings → Privacy & Security → Accessibility → enable SlideOver. |
+| "App is damaged / can't be opened" | Run `xattr -dr com.apple.quarantine ~/Applications/SlideOver.app` once. |
+| Access was granted but nothing happens after an update | Remove SlideOver under Accessibility with "–", relaunch, allow again. |
+
 ## Releasing a new version
 
 ```bash
@@ -60,10 +81,4 @@ Builds the app, commits, tags, pushes and creates a GitHub Release with the ZIP.
 
 ---
 
-## Deutsch
-
-Slide Over wie auf dem iPad (iPadOS 26) für den Mac: Je eine App pro Seite (links/rechts) gleitet per Tastenkürzel, Mausbewegung an den Bildschirmrand oder Klick auf den Pfeil-Griff vom Rand herein. Position und Größe werden pro Seite und App gemerkt. Die App startet bei der Anmeldung, merkt sich alles über Neustarts hinweg und aktualisiert sich automatisch über GitHub Releases.
-
-Installation: `./build.sh install`, danach in Systemeinstellungen → Datenschutz & Sicherheit → Bedienungshilfen den Zugriff für **SlideOver** erlauben.
-
-Kürzel: `⌃⌥⇧S` / `⌃⌥⇧A` vorderste App rechts / links festlegen · `⌃⌥S` / `⌃⌥A` rechts / links ein-/ausblenden.
+Not affiliated with Apple. "Slide Over" is an iPadOS feature name used here only to describe the behaviour.
