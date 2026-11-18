@@ -293,7 +293,9 @@ final class Slot {
 
     /// Aktuelle Fensterlage merken (nur wenn das Fenster überwiegend sichtbar ist).
     func saveCurrentFrame() {
-        guard let id = bundleID, let app, !app.isHidden,
+        // Direkt nach dem Einblenden nicht speichern – da kann die App ihren eigenen Rahmen kurz dazwischenschieben.
+        guard Date() > trackPausedUntil, animTimer == nil,
+              let id = bundleID, let app, !app.isHidden,
               let win = AX.window(of: app), let cur = AX.frame(win) else { return }
         let center = NSPoint(x: cur.midX, y: primaryHeight - cur.midY)
         guard let screen = NSScreen.screens.first(where: { NSMouseInRect(center, $0.frame, false) }) else { return }
@@ -301,8 +303,10 @@ final class Slot {
         let inter = cur.intersection(vis)
         guard !inter.isNull, inter.width >= cur.width * 0.6 else { return }
         let dx = side == .right ? vis.maxX - cur.maxX : cur.minX - vis.minX
-        Prefs.setFrame(SavedFrame(side: side.rawValue, dx: Double(max(0, dx)), dy: Double(max(0, cur.minY - vis.minY)),
-                                  w: Double(cur.width), h: Double(cur.height)), side, id)
+        let f = SavedFrame(side: side.rawValue, dx: Double(max(0, dx)), dy: Double(max(0, cur.minY - vis.minY)),
+                           w: Double(cur.width), h: Double(cur.height))
+        Prefs.setFrame(f, side, id)
+        NSLog("SlideOver \(side.rawValue): saved \(id) dx=\(Int(f.dx)) dy=\(Int(f.dy)) w=\(Int(f.w)) h=\(Int(f.h))")
         shownScreen = screen
     }
 
@@ -367,15 +371,54 @@ final class Slot {
             self.isShown = true
             self.shownScreen = screen
             SlideOverController.shared.refresh()
+            self.trackPausedUntil = Date().addingTimeInterval(1.2)
+            NSLog("SlideOver \(self.side.rawValue): restore \(id) → \(on)")
             if animated && start != on.origin {
                 self.animate(win, from: start, to: on.origin, duration: 0.22) {
                     AX.setSize(win, on.size) // manche Apps korrigieren die Größe nach dem Verschieben
                     AX.setPosition(win, on.origin)
+                    self.enforce(win, on)
                 }
             } else {
                 AX.setPosition(win, on.origin)
+                AX.setSize(win, on.size)
+                self.enforce(win, on)
             }
         }
+    }
+
+    /// Manche Apps (z.B. Electron, Nachrichten) stellen nach dem Einblenden ihre eigene Fenstergröße wieder her.
+    /// Deshalb den Zielrahmen kurz danach noch zweimal durchsetzen – außer der Nutzer greift gerade selbst zu.
+    func enforce(_ win: AXUIElement, _ target: CGRect) {
+        for delay in [0.25, 0.7] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                guard self.visibleNow, self.animTimer == nil, NSEvent.pressedMouseButtons == 0,
+                      let cur = AX.frame(win) else { return }
+                if abs(cur.minX - target.minX) > 3 || abs(cur.minY - target.minY) > 3
+                    || abs(cur.width - target.width) > 3 || abs(cur.height - target.height) > 3 {
+                    NSLog("SlideOver \(self.side.rawValue): app changed frame to \(cur), re-applying")
+                    AX.setPosition(win, target.origin)
+                    AX.setSize(win, target.size)
+                    AX.setPosition(win, target.origin)
+                }
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { self.lastTracked = AX.frame(win) }
+    }
+
+    /// Wird regelmäßig aufgerufen: merkt sich jede Änderung, die der Nutzer am sichtbaren Fenster macht
+    /// (auch wenn die App danach per ⌘H versteckt oder beendet wird).
+    var lastTracked: CGRect?
+    var trackPausedUntil = Date.distantPast
+
+    func trackFrame() {
+        guard visibleNow, animTimer == nil, Date() > trackPausedUntil,
+              NSEvent.pressedMouseButtons == 0, // erst nach dem Loslassen speichern
+              let app, let win = AX.window(of: app), let cur = AX.frame(win) else { return }
+        if let last = lastTracked, abs(last.minX - cur.minX) < 2, abs(last.minY - cur.minY) < 2,
+           abs(last.width - cur.width) < 2, abs(last.height - cur.height) < 2 { return }
+        lastTracked = cur
+        saveCurrentFrame()
     }
 
     func hide() {
@@ -647,6 +690,7 @@ final class SlideOverController: NSObject, NSApplicationDelegate, NSMenuDelegate
     var statusItem: NSStatusItem!
     var slots: [Side: Slot] = [:]
     var edgeTimer: Timer?
+    var trackTimer: Timer?
     var hotKeyRefs: [EventHotKeyRef?] = []
 
     func slot(_ side: Side) -> Slot { slots[side]! }
@@ -681,6 +725,9 @@ final class SlideOverController: NSObject, NSApplicationDelegate, NSMenuDelegate
         NotificationCenter.default.addObserver(self, selector: #selector(screensChanged),
                                                name: NSApplication.didChangeScreenParametersNotification, object: nil)
 
+        trackTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            self?.slots.values.forEach { $0.trackFrame() }
+        }
         edgeTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
             let m = NSEvent.mouseLocation
             self?.slots.values.forEach { $0.checkEdge(m); $0.updateHover(m) }
